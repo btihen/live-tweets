@@ -6,11 +6,20 @@ defmodule TweetsWeb.PostLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
+    # register with the channel if connection to LiveView
+    if connected?(socket), do: Messages.subscribe()
     {:ok, assign(socket, :posts, list_posts())}
   end
 
   @impl true
+  def handle_info({Messages, "posts-changed", posts}, socket) do
+    socket = assign(socket, :posts, posts)
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_params(params, _url, socket) do
+    # Tweets.Endpoint.subscribe("tweets")
     {:noreply, apply_action(socket, socket.assigns.live_action, params)}
   end
 
