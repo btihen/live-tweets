@@ -5,8 +5,27 @@ defmodule Tweets.Messages do
 
   import Ecto.Query, warn: false
   alias Tweets.Repo
-
   alias Tweets.Messages.Post
+
+  # Setup Broadcasting
+  @topic inspect(__MODULE__)
+
+  def subscribe do
+    Phoenix.PubSub.subscribe(Tweets.PubSub, @topic)
+  end
+
+  def notify_subscribers({:ok, post}, event) do
+    posts = list_posts()
+    Phoenix.PubSub.broadcast(Tweets.PubSub, @topic, {__MODULE__, event, posts})
+    {:ok, post}
+  end
+
+  def notify_subscribers({:error, post}, event) do
+    posts = list_posts()
+    Phoenix.PubSub.broadcast(Tweets.PubSub, @topic, {__MODULE__, event, posts})
+    {:error, post}
+  end
+  # Setup Broadcasting
 
   @doc """
   Returns the list of posts.
@@ -51,9 +70,11 @@ defmodule Tweets.Messages do
 
   """
   def create_post(attrs \\ %{}) do
-    %Post{}
-    |> Post.changeset(attrs)
-    |> Repo.insert()
+    event = "posts-changed"
+    {status, post} = %Post{}
+                      |> Post.changeset(attrs)
+                      |> Repo.insert()
+    notify_subscribers({status, post}, event)
   end
 
   @doc """
@@ -69,9 +90,11 @@ defmodule Tweets.Messages do
 
   """
   def update_post(%Post{} = post, attrs) do
-    post
-    |> Post.changeset(attrs)
-    |> Repo.update()
+    event = "posts-changed"
+    {status, post} = post
+                      |> Post.changeset(attrs)
+                      |> Repo.update()
+    notify_subscribers({status, post}, event)
   end
 
   @doc """
@@ -87,7 +110,9 @@ defmodule Tweets.Messages do
 
   """
   def delete_post(%Post{} = post) do
-    Repo.delete(post)
+    event = "posts-changed"
+    {status, post} = Repo.delete(post)
+    notify_subscribers({status, post}, event)
   end
 
   @doc """
